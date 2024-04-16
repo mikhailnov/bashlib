@@ -36,7 +36,7 @@ fi
 if [ -n "${QUERY_STRING}" ]; then 
   # name=value params, separated by either '&' or ';'
   if echo ${QUERY_STRING} | grep '=' >/dev/null ; then
-    for Q in $(@ECHO@ ${QUERY_STRING} | @TR@ ";&" "\012") ; do
+    for Q in $(echo ${QUERY_STRING} | @TR@ ";&" "\012") ; do
       #
       # Clear our local variables
       #
@@ -48,12 +48,12 @@ if [ -n "${QUERY_STRING}" ]; then
       # get the name of the key, and decode it
       #
       name=${Q%%=*}
-      name=$(@ECHO@ ${name} | \
+      name=$(echo ${name} | \
              @SED@ -e 's/%\(\)/\\\x/g' | \
              @TR@ "+" " ")
-      name=$(@ECHO@ ${name} | \
+      name=$(echo ${name} | \
              @TR@ -d ".-")
-      name=$(@PRINTF@ ${name} | @TR@ -d '$`')
+      name=$(printf ${name} | @TR@ -d '$`')
   
       #
       # get the value and decode it. This is tricky... printf chokes on
@@ -63,7 +63,7 @@ if [ -n "${QUERY_STRING}" ]; then
       # printf, and then remove it.
       #
       tmpvalue=${Q#*=}
-      tmpvalue=$(@ECHO@ ${tmpvalue} | \
+      tmpvalue=$(echo ${tmpvalue} | \
                  @SED@ -e 's/%\(..\)/\\\x\1 /g')
       #echo "Intermediate \$value: ${tmpvalue}" 1>&2
   
@@ -72,7 +72,7 @@ if [ -n "${QUERY_STRING}" ]; then
       # value
       #
       for i in ${tmpvalue}; do
-          g=$(@PRINTF@ ${i})
+          g=$(printf ${i})
           value="${value}${g}"
       done
       #value=$(echo ${value})
@@ -110,17 +110,17 @@ if [ -n "${HTTP_COOKIE}" ]; then
     # get the name of the key, and decode it
     #
     name=${Q%%=*}
-    name=$(@ECHO@ ${name} | \
+    name=$(echo ${name} | \
            @SED@ -e 's/%\(\)/\\\x/g' | \
            @TR@ "+" " ")
-    name=$(@ECHO@ ${name} | \
+    name=$(echo ${name} | \
            @TR@ -d ".-")
-    name=$(@PRINTF@ ${name})
+    name=$(printf ${name})
 
     # Decode the cookie value. See the parameter section above for
     # an explanation of what this is doing.
     tmpvalue=${Q#*=}
-    tmpvalue=$(@ECHO@ ${tmpvalue} | \
+    tmpvalue=$(echo ${tmpvalue} | \
                @SED@ -e 's/%\(..\)/\\\x\1 /g')
     #echo "Intermediate \$value: ${tmpvalue}" 1>&2
 
@@ -129,7 +129,7 @@ if [ -n "${HTTP_COOKIE}" ]; then
     # value
     #
     for i in ${tmpvalue}; do
-        g=$(@PRINTF@ ${i})
+        g=$(printf ${i})
         value="${value}${g}"
     done
     #value=$(echo ${value})
