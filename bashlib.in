@@ -182,7 +182,7 @@ param() {
   fi
   # "+" is URL-encoded as "%2B", web server replaces spaces with "+", replace back,
   # otherwise safe_param() just removes the "+" sign and looses the space.
-  echo "${value}" | @SED@ -e 's/+/ /'
+  echo "${value}" | @SED@ -e 's/+/ /g'
   unset name
   unset value
 }

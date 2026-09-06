@@ -101,11 +101,17 @@ ok 'GET: parameters separated by & and ;' '1\n2\n3\n'
 bl 'param q' 'QUERY_STRING=q=hello+world'
 ok 'GET: + decodes to space' 'hello world\n'
 
+bl 'param q' 'QUERY_STRING=q=one+two+three+four'
+ok 'GET: every + decodes to space, not only the first one' 'one two three four\n'
+
+bl 'param q' 'QUERY_STRING=q=a++b'
+ok 'GET: consecutive + decode to consecutive spaces' 'a  b\n'
+
 bl 'param w' 'QUERY_STRING=w=hello%20world'
 ok 'GET: %XX hex escapes decode' 'hello world\n'
 
-bl 'param p' 'QUERY_STRING=p=b%2Bc'
-ok 'GET: encoded %2B is returned as space (current behaviour)' 'b c\n'
+bl 'param p' 'QUERY_STRING=p=b%2Bc%2Bd'
+ok 'GET: every encoded %2B is returned as space' 'b c d\n'
 
 bl 'param s' 'QUERY_STRING=s=%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82'
 ok 'GET: multi-byte utf-8 %XX sequences decode' 'привет\n'
@@ -143,8 +149,8 @@ bl 'safe_param msg' 'QUERY_STRING=msg=hello+world'
 ok 'safe_param: benign text and spaces survive' 'hello world\n'
 
 bl 'safe_param msg' 'QUERY_STRING=msg=hello+world+123'
-ok 'safe_param: only the first + becomes a space (current behaviour)' \
-   'hello world123\n'
+ok 'safe_param: spaces are not lost after the first +' \
+   'hello world 123\n'
 
 # --- keywords() ---------------------------------------------------------
 
