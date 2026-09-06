@@ -7,6 +7,12 @@
 
 # bashlib is used by sourcing it at the beginning of scripts that
 # needs its functionality (by using the . or source commands).
+#
+# The library targets bash: it relies on bash-only features such as
+# ${!var} indirection, printf -v, ${!PREFIX@} listings, ${var//pat/rep}
+# substitution and read -d. All hot paths are fork-free (builtins only):
+# param()/cookie() used to spawn env|grep|sed|cut on every call, and the
+# URL decoding used to fork once per %XX escape.
 
 PATH=/bin:/usr/bin
 
@@ -21,65 +27,58 @@ VERSION="2"
 # do the parameter/cookie parsing.
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
+# Characters removed by safe_param(), as one glob character class.
+SAFE_STRIP='[$`<>"%;)(&+'"'"']'
+
 # capture stdin for POST methods. POST requests don't always come in
-# with a newline attached, so we use cat to grab stdin and append a newline.
-# This is a wonderful hack, and thanks to paulb.
-STDIN=$(@CAT@)
+# with a newline attached, so read everything up to EOF (the empty -d
+# delimiter means NUL, which never occurs in CGI input).
+STDIN=
+IFS= read -r -d '' STDIN || true
 if [ -n "${STDIN}" ]; then
   QUERY_STRING="${STDIN}&${QUERY_STRING}"
 fi
 
 # Handle GET and POST requests... (the QUERY_STRING will be set)
-if [ -n "${QUERY_STRING}" ]; then 
+if [ -n "${QUERY_STRING}" ]; then
   # name=value params, separated by either '&' or ';'
-  if echo "${QUERY_STRING}" | grep '=' >/dev/null ; then
-    for Q in $(echo "${QUERY_STRING}" | @TR@ ";&" "\012") ; do
+  case ${QUERY_STRING} in
+  *=*)
+    for Q in ${QUERY_STRING//[;&]/ } ; do
       #
       # Clear our local variables
       #
       unset name
-      unset value
-      unset tmpvalue
-  
+      value=
+
       #
-      # get the name of the key, and decode it
+      # Decode the name of the key: turn %XX into \xHH for printf,
+      # decode '+' as a space, then strip '.', '-', '$' and '`' so the
+      # name can never break the eval below.
       #
       name=${Q%%=*}
-      name=$(echo "${name}" | \
-             @SED@ -e 's/%\(\)/\\\x/g' | \
-             @TR@ "+" " ")
-      name=$(echo "${name}" | \
-             @TR@ -d ".-")
-      name=$(printf '%b' "${name}" | @TR@ -d '$\`')
-  
+      name=${name//%/\\x}
+      name=${name//+/ }
+      name=${name//[.-]/}
+      printf -v name '%b' "${name}"
+      name=${name//$/}
+      name=${name//\`/}
+
       #
-      # get the value and decode it. This is tricky... printf chokes on
-      # hex values in the form \xNN when there is another hex-ish value
-      # (i.e., a-fA-F) immediately after the first two. My (horrible)
-      # solution is to put a space aftet the \xNN, give the value to
-      # printf, and then remove it.
+      # Decode the value: turn %XX into \xHH and let a single printf
+      # do the whole job. printf reads at most two hex digits per \xHH,
+      # so no separators between escapes are needed.
       #
-      tmpvalue=${Q#*=}
-      tmpvalue=$(echo "${tmpvalue}" | \
-                 @SED@ -e 's/%\(..\)/\\\x\1 /g')
-      #echo "Intermediate \$value: ${tmpvalue}" 1>&2
-  
-      #
-      # Iterate through tmpvalue and printf each string, and append it to
-      # value
-      #
-      for i in ${tmpvalue}; do
-          g=$(printf '%b' "${i}")
-          value="${value}${g}"
-      done
-      #value=$(echo ${value})
-  
+      value=${Q#*=}
+      printf -v value '%b' "${value//%/\\x}"
+
       eval "export FORM_${name}='${value}'"
     done
-  else # keywords: foo.cgi?a+b+c
-    Q=$(echo "${QUERY_STRING}" | tr '+' ' ')
-    eval "export KEYWORDS='${Q}'"
-  fi
+    ;;
+  *) # keywords: foo.cgi?a+b+c
+    eval "export KEYWORDS='${QUERY_STRING//+/ }'"
+    ;;
+  esac
 fi
 
 #
@@ -89,14 +88,13 @@ fi
 # help distinguish them from the other variables that get set
 # automatically.
 #
-if [ -n "${HTTP_COOKIE}" ]; then 
+if [ -n "${HTTP_COOKIE}" ]; then
   for Q in ${HTTP_COOKIE}; do
     #
     # Clear our local variables
     #
     name=
     value=
-    tmpvalue=
 
     #
     # Strip trailing ; off the value
@@ -104,37 +102,23 @@ if [ -n "${HTTP_COOKIE}" ]; then
     Q=${Q%;}
 
     #
-    # get the name of the key, and decode it
+    # Decode the name of the key; see the parameter section above.
     #
     name=${Q%%=*}
-    name=$(echo "${name}" | \
-           @SED@ -e 's/%\(\)/\\\x/g' | \
-           @TR@ "+" " ")
-    name=$(echo "${name}" | \
-           @TR@ -d ".-")
-    name=$(printf '%b' "${name}")
-
-    # Decode the cookie value. See the parameter section above for
-    # an explanation of what this is doing.
-    tmpvalue=${Q#*=}
-    tmpvalue=$(echo "${tmpvalue}" | \
-               @SED@ -e 's/%\(..\)/\\\x\1 /g')
-    #echo "Intermediate \$value: ${tmpvalue}" 1>&2
+    name=${name//%/\\x}
+    name=${name//+/ }
+    name=${name//[.-]/}
+    printf -v name '%b' "${name}"
 
     #
-    # Iterate through tmpvalue and printf each string, and append it to
-    # value
+    # Decode the cookie value; see the parameter section above.
     #
-    for i in ${tmpvalue}; do
-        g=$(printf '%b' "${i}")
-        value="${value}${g}"
-    done
-    #value=$(echo ${value})
+    value=${Q#*=}
+    printf -v value '%b' "${value//%/\\x}"
 
     #
     # Export COOKIE_${name} into the environment
     #
-    #echo "exporting COOKIE_${name}=${value}" 1>&2
     eval "export COOKIE_${name}='${value}'"
   done
 fi
@@ -154,6 +138,18 @@ version_html() {
 }
 
 #
+# Internal helper: store the raw stored value of parameter $1 in REPLY.
+# Anything that is not a valid variable name yields an empty value.
+#
+_param_value() {
+  local name="FORM_${1#FORM_}"
+  case ${name} in
+    FORM_|FORM_*[!A-Za-z0-9_]*) REPLY= ;;
+    *) REPLY="${!name}" ;;
+  esac
+}
+
+#
 # Parameter function.
 # * When called with no arguments, returns a list of parameters that
 #   were passed in.
@@ -164,47 +160,57 @@ version_html() {
 #   that name.
 #
 param() {
-  local name
-  local value
+  local name value
   if [ $# -eq 1 ]; then
-    name=$1
-    name=$(echo "${name}" | @SED@ -e 's/FORM_//')
-    value=$(@ENV@ | @GREP@ "^FORM_${name}=" | @SED@ -e 's/FORM_//' | @CUT@ -d= -f2-)
+    _param_value "$1"
+    value="${REPLY//+/ }"
   elif [ $# -gt 1 ]; then
     name=$1
     shift
     eval "export 'FORM_${name}=$*'"
     return
   else
-    value=$(@ENV@ | @GREP@ '^FORM_' | @SED@ -e 's/FORM_//' | @CUT@ -d= -f1)
+    for name in ${!FORM_@}; do
+      echo "${name#FORM_}"
+    done
+    return
   fi
-  # "+" is URL-encoded as "%2B", web server replaces spaces with "+", replace back,
-  # otherwise safe_param() just removes the "+" sign and looses the space.
-  echo "${value}" | @SED@ -e 's/+/ /g'
+  echo "${value}"
   unset name
   unset value
 }
 
 # shell invocation and X-site scripting prevention
 safe_param() {
-	param "$@" | @TR@ -d '$`<>"%;)(&+'"'"
+  local value
+  if [ $# -eq 1 ]; then
+    _param_value "$1"
+    value="${REPLY//+/ }"
+    echo "${value//${SAFE_STRIP}/}"
+  else
+    param "$@"
+  fi
 }
 
 # cookie function. Same explanation as param
 cookie() {
-  local name
-  local value
+  local name value
   if [ $# -eq 1 ]; then
-    name=$1
-    name=$(echo "${name}" | @SED@ -e 's/COOKIE_//')
-    value=$(@ENV@ | @GREP@ "^COOKIE_${name}" | @SED@ -e 's/COOKIE_//' | @CUT@ -d= -f2-)
+    name="COOKIE_${1#COOKIE_}"
+    case ${name} in
+      COOKIE_|COOKIE_*[!A-Za-z0-9_]*) value= ;;
+      *) value="${!name}" ;;
+    esac
   elif [ $# -gt 1 ]; then
     name=$1
     shift
     eval "export 'COOKIE_${name}=$*'"
     return
   else
-    value=$(@ENV@ | @GREP@ '^COOKIE_' | @SED@ -e 's/COOKIE_//' | @CUT@ -d= -f1)
+    for name in ${!COOKIE_@}; do
+      echo "${name#COOKIE_}"
+    done
+    return
   fi
   echo "${value}"
   unset name
@@ -242,4 +248,3 @@ send_redirect() {
   echo "Location: ${uri}"
   echo ""
 }
-
