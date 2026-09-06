@@ -145,9 +145,9 @@ ok 'param: no arguments lists parameter names' 'a\nb\nc\n'
 bl 'param FORM_a' 'QUERY_STRING=a=1'
 ok 'param: FORM_ prefix is stripped from the argument' '1\n'
 
-bl 'param foo bar baz >/dev/null
+bl 'param foo bar baz
 param foo'
-ok 'param: set value and read it back' 'bar baz\n'
+ok 'param: set value silently and read it back' 'bar baz\n'
 
 # --- safe_param() -------------------------------------------------------
 
@@ -186,21 +186,21 @@ bl 'cookie' 'HTTP_COOKIE=session=abc123; theme=dark'
 ok 'cookie: no arguments lists cookie names (space-separated, unlike param)' \
    'session theme\n'
 
-bl 'cookie foo bar qux >/dev/null
-cookie foo'
-ok 'cookie: set value and read it back' 'bar qux\n'
-
 bl 'cookie org' 'HTTP_COOKIE=org=%D0%90%D0%BB%D1%8C%D1%84%D0%B0-%D0%91%D0%B0%D0%BD%D0%BA'
 ok 'cookies: literal - before %XX does not break decoding' 'Альфа-Банк\n'
 
+bl 'cookie foo bar qux
+cookie foo'
+ok 'cookie: set value silently and read it back' 'bar qux\n'
+
 # --- set_cookie() -------------------------------------------------------
 
-bl 'set_cookie theme light >/dev/null
-set_cookie lang en >/dev/null
+bl 'set_cookie theme light
+set_cookie lang en
 echo "[$bashlib_cookies]"
 cookie theme
 cookie lang'
-ok 'set_cookie: accumulates pairs and exports them (leading space is current behaviour)' \
+ok 'set_cookie: accumulates pairs silently and exports them (leading space is current behaviour)' \
    '[ theme=light; lang=en]\nlight\nen\n'
 
 # --- send_redirect() ----------------------------------------------------

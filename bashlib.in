@@ -177,6 +177,7 @@ param() {
     name=$1
     shift
     eval "export 'FORM_${name}=$*'"
+    return
   else
     value=$(@ENV@ | @GREP@ '^FORM_' | @SED@ -e 's/FORM_//' | @CUT@ -d= -f1)
   fi
@@ -204,6 +205,7 @@ cookie() {
     name=$1
     shift
     eval "export 'COOKIE_${name}=$*'"
+    return
   else
     value=$(@ENV@ | @GREP@ '^COOKIE_' | @SED@ -e 's/COOKIE_//' | @CUT@ -d= -f1)
   fi
