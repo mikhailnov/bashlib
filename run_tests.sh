@@ -84,11 +84,11 @@ echo
 # --- version ------------------------------------------------------------
 
 bl 'version'
-ok 'version prints name and release' 'bashlib, version 2\n'
+ok 'version prints name and release' 'bashlib, version 4\n'
 
 bl 'version_html'
 ok 'version_html prints html link and version' \
-   '<a href="http://sevenroot.org/dlc/2000/12/bashlib">bashlib</a>,version 2\n'
+   '<a href="http://sevenroot.org/dlc/2000/12/bashlib">bashlib</a>,version 4\n'
 
 # --- GET parameter parsing ----------------------------------------------
 

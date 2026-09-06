@@ -21,7 +21,7 @@
 # tools, so the checked-out file is the finished library.
 PREFIX ?= /usr/local
 DESTDIR ?=
-VERSION = 2
+VERSION = 4
 
 all:
 	@echo "nothing to build; try 'make check' or 'make install'"

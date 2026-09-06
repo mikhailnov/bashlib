@@ -18,7 +18,7 @@
 # Set version number
 # Must be an integer because bash cannot compare float numbers
 #
-VERSION="2"
+VERSION="4"
 
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 # Initialization stuff begins here. These things run immediately, and

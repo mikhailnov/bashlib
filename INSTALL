@@ -1,4 +1,4 @@
-bashlib 2
+bashlib 4
 
 bashlib is a bash library: there is nothing to configure and nothing
 to build, the checked-out file is the finished library (it calls no
