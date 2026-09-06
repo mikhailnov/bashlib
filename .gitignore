@@ -1,6 +1,1 @@
-Makefile
-autom4te.cache
-bashlib
-config.log
-config.status
-configure
+bashlib-*.tar.gz

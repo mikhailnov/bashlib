@@ -1,11 +1,19 @@
-bashlib 0.5
+bashlib 2
 
-Installation of bashlib is relatively straightforward:
+bashlib is a bash library: there is nothing to configure and nothing
+to build, the checked-out file is the finished library (it calls no
+external tools). To run the test suite:
 
-  # gunzip -c bashlib-0.5.tar.gz | tar xf -
-  # cd bashlib-0.5
-  # ./configure
+  # make check
+
+To install (the default prefix is /usr/local):
+
   # make install
+  # make install PREFIX=/usr          # or wherever
+
+Packagers can use the usual DESTDIR redirection:
+
+  # make install DESTDIR=$RPM_BUILD_ROOT
 
 Using bashlib in your CGI scripts is as simple as beginning your
 scripts with:
@@ -38,7 +46,6 @@ needs to be done. Patches and feature requests are accepted.
 TODO
 
  * Better documentation, probably a man page
- * Autoconf-based install script
  * More functions
    * Functions to generate HTML
    * Functions to set cookies

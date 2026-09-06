@@ -17,7 +17,7 @@ here=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd) || exit 1
 LIB=$here/bashlib
 
 if [ ! -f "$LIB" ]; then
-	echo "bashlib not found at $LIB -- run ./configure first" >&2
+	echo "bashlib not found at $LIB -- broken checkout?" >&2
 	exit 1
 fi
 

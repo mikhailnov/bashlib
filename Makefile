@@ -1,9 +1,6 @@
 # Makefile for bashlib
 # ----------------------------------------------------------------------
-# $Id$
-# @configure_input@
-# ----------------------------------------------------------------------
-# bashlib 
+# bashlib
 # Copyright (C) 2002-2005 darren chamberlain <dlc@sevenroot.org>
 #
 # This program is free software; you can redistribute it and/or modify
@@ -20,37 +17,30 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
 # USA
 # ----------------------------------------------------------------------
-PREFIX = @prefix@
-VERSION = @bashlib_version@
+# There is nothing to configure or build: bashlib calls no external
+# tools, so the checked-out file is the finished library.
+PREFIX ?= /usr/local
+DESTDIR ?=
+VERSION = 2
 
 all:
-	./configure
+	@echo "nothing to build; try 'make check' or 'make install'"
 
 install:
-	@INSTALL@ bashlib $(PREFIX)/bin
+	mkdir -p $(DESTDIR)$(PREFIX)/bin
+	install -m 755 bashlib $(DESTDIR)$(PREFIX)/bin
+
 check:
 	./run_tests.sh
 
 dist:
-	@MKDIR@ bashlib-$(VERSION)
-	@CP@ configure bashlib-$(VERSION)/
-	@CP@ bashlib.in bashlib-$(VERSION)/
-	@CP@ Makefile.in bashlib-$(VERSION)/
-	@CP@ INSTALL bashlib-$(VERSION)/
-	@CP@ COPYING bashlib-$(VERSION)/
+	mkdir bashlib-$(VERSION)
+	cp bashlib Makefile INSTALL COPYING run_tests.sh bashlib-$(VERSION)/
+	cp -r examples bashlib-$(VERSION)/
 	cd bashlib-$(VERSION); ln -s INSTALL README
-	@TAR@ cf bashlib-$(VERSION).tar bashlib-$(VERSION)
-	@GZIP@ --best bashlib-$(VERSION).tar
-	@RM@ -rf bashlib-$(VERSION)
+	tar cf bashlib-$(VERSION).tar bashlib-$(VERSION)
+	gzip --best bashlib-$(VERSION).tar
+	rm -rf bashlib-$(VERSION)
 
 clean:
-	@RM@ -f Makefile bashlib config.cache config.log config.status 
-	@RM@ -fr ./autom4te.cache/
-
-cvs-clean:
-	$(MAKE) clean
-	@RM@ -f configure
-	@RM@ -f bashlib-$(VERSION).tar.gz
-
-distclean:
-	$(MAKE) cvs-clean
+	rm -f bashlib-$(VERSION).tar bashlib-$(VERSION).tar.gz

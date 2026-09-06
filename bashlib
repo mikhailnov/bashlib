@@ -1,4 +1,4 @@
-#!@BASH@
+#!/bin/bash
 
 # Author:     darren chamberlain <dlc@sevenroot.org>
 # Co-Author:  Paul Bournival <paulb-ns@cajun.nu>
@@ -13,8 +13,6 @@
 # substitution and read -d. All hot paths are fork-free (builtins only):
 # param()/cookie() used to spawn env|grep|sed|cut on every call, and the
 # URL decoding used to fork once per %XX escape.
-
-PATH=/bin:/usr/bin
 
 #
 # Set version number
