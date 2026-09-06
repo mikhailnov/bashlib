@@ -72,7 +72,7 @@ if [ -n "${QUERY_STRING}" ]; then
       # value
       #
       for i in ${tmpvalue}; do
-          g=$(printf ${i})
+          g=$(printf '%b' "${i}")
           value="${value}${g}"
       done
       #value=$(echo ${value})
@@ -129,7 +129,7 @@ if [ -n "${HTTP_COOKIE}" ]; then
     # value
     #
     for i in ${tmpvalue}; do
-        g=$(printf ${i})
+        g=$(printf '%b' "${i}")
         value="${value}${g}"
     done
     #value=$(echo ${value})

@@ -116,6 +116,18 @@ ok 'GET: every encoded %2B is returned as space' 'b c d\n'
 bl 'param s' 'QUERY_STRING=s=%D0%BF%D1%80%D0%B8%D0%B2%D0%B5%D1%82'
 ok 'GET: multi-byte utf-8 %XX sequences decode' 'привет\n'
 
+bl 'param org' 'QUERY_STRING=org=%D0%90%D0%9E+%D0%90%D0%BB%D1%8C%D1%84%D0%B0-%D0%91%D0%B0%D0%BD%D0%BA+%D0%A1%D1%83%D0%BF%D0%B5%D1%80'
+ok 'GET: literal - before %XX does not break decoding' 'АО Альфа-Банк Супер\n'
+
+bl 'param q' 'QUERY_STRING=q=-%D0%B0y'
+ok 'GET: %-escape glued after a literal - decodes fully' '-аy\n'
+
+bl 'param q' 'QUERY_STRING=q=-start'
+ok 'GET: value starting with - is not eaten' '-start\n'
+
+bl 'param x' 'QUERY_STRING=x=50%25+off'
+ok 'GET: decoded % char survives round trip' '50% off\n'
+
 bl 'param usernamex' 'QUERY_STRING=user.name-x=1'
 ok 'GET: dots and dashes are stripped from names' '1\n'
 
@@ -177,6 +189,9 @@ ok 'cookie: no arguments lists cookie names (space-separated, unlike param)' \
 bl 'cookie foo bar qux >/dev/null
 cookie foo'
 ok 'cookie: set value and read it back' 'bar qux\n'
+
+bl 'cookie org' 'HTTP_COOKIE=org=%D0%90%D0%BB%D1%8C%D1%84%D0%B0-%D0%91%D0%B0%D0%BD%D0%BA'
+ok 'cookies: literal - before %XX does not break decoding' 'Альфа-Банк\n'
 
 # --- set_cookie() -------------------------------------------------------
 
