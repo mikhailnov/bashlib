@@ -21,9 +21,6 @@ VERSION="2"
 # do the parameter/cookie parsing.
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
-# Global debug flag. Set to 0 to disable debugging throughout the lib
-DEBUG=0
-
 # capture stdin for POST methods. POST requests don't always come in
 # with a newline attached, so we use cat to grab stdin and append a newline.
 # This is a wonderful hack, and thanks to paulb.
@@ -35,8 +32,8 @@ fi
 # Handle GET and POST requests... (the QUERY_STRING will be set)
 if [ -n "${QUERY_STRING}" ]; then 
   # name=value params, separated by either '&' or ';'
-  if echo ${QUERY_STRING} | grep '=' >/dev/null ; then
-    for Q in $(echo ${QUERY_STRING} | @TR@ ";&" "\012") ; do
+  if echo "${QUERY_STRING}" | grep '=' >/dev/null ; then
+    for Q in $(echo "${QUERY_STRING}" | @TR@ ";&" "\012") ; do
       #
       # Clear our local variables
       #
@@ -48,12 +45,12 @@ if [ -n "${QUERY_STRING}" ]; then
       # get the name of the key, and decode it
       #
       name=${Q%%=*}
-      name=$(echo ${name} | \
+      name=$(echo "${name}" | \
              @SED@ -e 's/%\(\)/\\\x/g' | \
              @TR@ "+" " ")
-      name=$(echo ${name} | \
+      name=$(echo "${name}" | \
              @TR@ -d ".-")
-      name=$(printf ${name} | @TR@ -d '$`')
+      name=$(printf '%b' "${name}" | @TR@ -d '$\`')
   
       #
       # get the value and decode it. This is tricky... printf chokes on
@@ -63,7 +60,7 @@ if [ -n "${QUERY_STRING}" ]; then
       # printf, and then remove it.
       #
       tmpvalue=${Q#*=}
-      tmpvalue=$(echo ${tmpvalue} | \
+      tmpvalue=$(echo "${tmpvalue}" | \
                  @SED@ -e 's/%\(..\)/\\\x\1 /g')
       #echo "Intermediate \$value: ${tmpvalue}" 1>&2
   
@@ -80,7 +77,7 @@ if [ -n "${QUERY_STRING}" ]; then
       eval "export FORM_${name}='${value}'"
     done
   else # keywords: foo.cgi?a+b+c
-    Q=$(echo ${QUERY_STRING} | tr '+' ' ')
+    Q=$(echo "${QUERY_STRING}" | tr '+' ' ')
     eval "export KEYWORDS='${Q}'"
   fi
 fi
@@ -110,17 +107,17 @@ if [ -n "${HTTP_COOKIE}" ]; then
     # get the name of the key, and decode it
     #
     name=${Q%%=*}
-    name=$(echo ${name} | \
+    name=$(echo "${name}" | \
            @SED@ -e 's/%\(\)/\\\x/g' | \
            @TR@ "+" " ")
-    name=$(echo ${name} | \
+    name=$(echo "${name}" | \
            @TR@ -d ".-")
-    name=$(printf ${name})
+    name=$(printf '%b' "${name}")
 
     # Decode the cookie value. See the parameter section above for
     # an explanation of what this is doing.
     tmpvalue=${Q#*=}
-    tmpvalue=$(echo ${tmpvalue} | \
+    tmpvalue=$(echo "${tmpvalue}" | \
                @SED@ -e 's/%\(..\)/\\\x\1 /g')
     #echo "Intermediate \$value: ${tmpvalue}" 1>&2
 
@@ -171,7 +168,7 @@ param() {
   local value
   if [ $# -eq 1 ]; then
     name=$1
-    name=$(echo ${name} | @SED@ -e 's/FORM_//')
+    name=$(echo "${name}" | @SED@ -e 's/FORM_//')
     value=$(@ENV@ | @GREP@ "^FORM_${name}=" | @SED@ -e 's/FORM_//' | @CUT@ -d= -f2-)
   elif [ $# -gt 1 ]; then
     name=$1
@@ -190,7 +187,7 @@ param() {
 
 # shell invocation and X-site scripting prevention
 safe_param() {
-	param $* | @TR@ -d '$`<>"%;)(&+'"'"
+	param "$@" | @TR@ -d '$`<>"%;)(&+'"'"
 }
 
 # cookie function. Same explanation as param
@@ -199,7 +196,7 @@ cookie() {
   local value
   if [ $# -eq 1 ]; then
     name=$1
-    name=$(echo ${name} | @SED@ -e 's/COOKIE_//')
+    name=$(echo "${name}" | @SED@ -e 's/COOKIE_//')
     value=$(@ENV@ | @GREP@ "^COOKIE_${name}" | @SED@ -e 's/COOKIE_//' | @CUT@ -d= -f2-)
   elif [ $# -gt 1 ]; then
     name=$1
@@ -209,7 +206,7 @@ cookie() {
   else
     value=$(@ENV@ | @GREP@ '^COOKIE_' | @SED@ -e 's/COOKIE_//' | @CUT@ -d= -f1)
   fi
-  echo ${value}
+  echo "${value}"
   unset name
   unset value
 }
@@ -217,7 +214,7 @@ cookie() {
 # keywords returns a list of keywords. This is only set when the script is
 # called with an ISINDEX form (these are pretty rare nowadays).
 keywords() {
-  echo ${KEYWORDS}
+  echo "${KEYWORDS}"
 }
 
 set_cookie() {
@@ -228,7 +225,7 @@ set_cookie() {
 
   bashlib_cookies=${bashlib_cookies#;}
 
-  cookie $name $value
+  cookie "$name" "$value"
 }
 
 #

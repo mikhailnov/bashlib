@@ -131,6 +131,9 @@ ok 'GET: decoded % char survives round trip' '50% off\n'
 bl 'param usernamex' 'QUERY_STRING=user.name-x=1'
 ok 'GET: dots and dashes are stripped from names' '1\n'
 
+bl 'param asb' 'QUERY_STRING=a%73b=1'
+ok 'GET: %XX escapes in names decode' '1\n'
+
 bl 'param a' 'QUERY_STRING=a='
 ok 'GET: empty value yields empty string' '\n'
 
@@ -164,10 +167,17 @@ bl 'safe_param msg' 'QUERY_STRING=msg=hello+world+123'
 ok 'safe_param: spaces are not lost after the first +' \
    'hello world 123\n'
 
+bl 'safe_param "foo bar" >/dev/null
+param | grep -c .'
+ok 'safe_param: a name with spaces does not silently set a param' '0\n'
+
 # --- keywords() ---------------------------------------------------------
 
 bl 'keywords' 'QUERY_STRING=alpha+beta+gamma'
 ok 'keywords: isindex-style query becomes a keyword list' 'alpha beta gamma\n'
+
+bl 'keywords' 'QUERY_STRING=alpha++beta'
+ok 'keywords: consecutive + keep consecutive spaces' 'alpha  beta\n'
 
 # --- POST via stdin -----------------------------------------------------
 
@@ -182,9 +192,8 @@ ok 'POST: stdin params are merged with QUERY_STRING' '1\n2\n'
 bl 'cookie session; cookie theme' 'HTTP_COOKIE=session=abc123; theme=dark'
 ok 'cookies: HTTP_COOKIE is parsed' 'abc123\ndark\n'
 
-bl 'cookie' 'HTTP_COOKIE=session=abc123; theme=dark'
-ok 'cookie: no arguments lists cookie names (space-separated, unlike param)' \
-   'session theme\n'
+bl 'cookie | sort' 'HTTP_COOKIE=session=abc123; theme=dark'
+ok 'cookie: no arguments lists cookie names, one per line' 'session\ntheme\n'
 
 bl 'cookie org' 'HTTP_COOKIE=org=%D0%90%D0%BB%D1%8C%D1%84%D0%B0-%D0%91%D0%B0%D0%BD%D0%BA'
 ok 'cookies: literal - before %XX does not break decoding' 'Альфа-Банк\n'
@@ -193,8 +202,15 @@ bl 'cookie foo bar qux
 cookie foo'
 ok 'cookie: set value silently and read it back' 'bar qux\n'
 
+bl 'cookie foo "a  b"
+cookie foo'
+ok 'cookie: consecutive spaces in a value survive' 'a  b\n'
+
 # --- set_cookie() -------------------------------------------------------
 
+# $bashlib_cookies must stay literal: it is expanded by the inner bash of
+# the test case, not by the runner.
+# shellcheck disable=SC2016
 bl 'set_cookie theme light
 set_cookie lang en
 echo "[$bashlib_cookies]"
@@ -203,6 +219,13 @@ cookie lang'
 ok 'set_cookie: accumulates pairs silently and exports them (leading space is current behaviour)' \
    '[ theme=light; lang=en]\nlight\nen\n'
 
+# Same as above: expanded inside the case's inner bash.
+# shellcheck disable=SC2016
+bl 'set_cookie m "a  b"
+echo "[$bashlib_cookies]"
+cookie m'
+ok 'set_cookie: preserves consecutive spaces in values' '[ m=a  b]\na  b\n'
+
 # --- send_redirect() ----------------------------------------------------
 
 bl 'send_redirect http://example.org/x'
@@ -210,6 +233,8 @@ ok 'send_redirect: emits Location header and a blank line' \
    'Location: http://example.org/x\n\n'
 
 bl 'send_redirect' 'SERVER_NAME=www.example.org' 'SCRIPT_NAME=cgi-bin/app.cgi'
+# Description text; $SERVER_NAME is literal.
+# shellcheck disable=SC2016
 ok 'send_redirect: defaults to http://$SERVER_NAME/$SCRIPT_NAME' \
    'Location: http://www.example.org/cgi-bin/app.cgi\n\n'
 
