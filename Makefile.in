@@ -28,6 +28,8 @@ all:
 
 install:
 	@INSTALL@ bashlib $(PREFIX)/bin
+check:
+	./run_tests.sh
 
 dist:
 	@MKDIR@ bashlib-$(VERSION)
