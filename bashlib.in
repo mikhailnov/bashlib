@@ -28,11 +28,14 @@ VERSION="2"
 # -=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-
 
 # Characters removed by safe_param(), as one glob character class.
+# The class is built by concatenation because a literal ' cannot
+# appear inside a '...' string: '[$`<>"%;)(&+' + "'" + ']'.
 SAFE_STRIP='[$`<>"%;)(&+'"'"']'
 
 # capture stdin for POST methods. POST requests don't always come in
 # with a newline attached, so read everything up to EOF (the empty -d
-# delimiter means NUL, which never occurs in CGI input).
+# delimiter means NUL, which never occurs in CGI input). A plain
+# $(cat) would fork; read is a builtin.
 STDIN=
 IFS= read -r -d '' STDIN || true
 if [ -n "${STDIN}" ]; then
@@ -44,6 +47,9 @@ if [ -n "${QUERY_STRING}" ]; then
   # name=value params, separated by either '&' or ';'
   case ${QUERY_STRING} in
   *=*)
+    # '&' and ';' become spaces, so the unquoted expansion below splits
+    # QUERY_STRING into one word per parameter:
+    #   "a=1&b=2;c=3" -> "a=1 b=2 c=3" -> words "a=1" "b=2" "c=3"
     for Q in ${QUERY_STRING//[;&]/ } ; do
       #
       # Clear our local variables
@@ -52,30 +58,41 @@ if [ -n "${QUERY_STRING}" ]; then
       value=
 
       #
-      # Decode the name of the key: turn %XX into \xHH for printf,
-      # decode '+' as a space, then strip '.', '-', '$' and '`' so the
-      # name can never break the eval below.
+      # Decode the name of the key so that it can never break the eval
+      # below: turn %XX into \xHH for printf, decode '+' as a space,
+      # then strip '.', '-', '$' and '`'.
       #
+      # cut at the first '=':     "user%2Ename=admin" -> "user%2Ename"
       name=${Q%%=*}
+      # every % becomes \x:       "user%2Ename"       -> "user\x2Ename"
       name=${name//%/\\x}
+      # '+' is an encoded space:  "a+b+c"             -> "a b c"
       name=${name//+/ }
+      # delete '.' and '-' (literal ones only; encoded %2E/%2D survive
+      # here and decode back below): "user.name-x"    -> "usernamex"
       name=${name//[.-]/}
+      # decode \xHH hex:          "user\x2Enamex"     -> "user.namex"
       printf -v name '%b' "${name}"
+      # delete every '$'
       name=${name//$/}
+      # delete every '`'
       name=${name//\`/}
 
       #
       # Decode the value: turn %XX into \xHH and let a single printf
-      # do the whole job. printf reads at most two hex digits per \xHH,
-      # so no separators between escapes are needed.
+      # do the whole job. printf reads at most two hex digits per
+      # \xHH, so no separators between escapes are needed.
       #
+      # cut at the first '=':     "q=hello%21" -> "hello%21"
       value=${Q#*=}
+      # decode %XX:               "hello%21"   -> "hello!"
       printf -v value '%b' "${value//%/\\x}"
 
       eval "export FORM_${name}='${value}'"
     done
     ;;
   *) # keywords: foo.cgi?a+b+c
+    # "alpha+beta+gamma" -> "alpha beta gamma"
     eval "export KEYWORDS='${QUERY_STRING//+/ }'"
     ;;
   esac
@@ -97,23 +114,30 @@ if [ -n "${HTTP_COOKIE}" ]; then
     value=
 
     #
-    # Strip trailing ; off the value
+    # drop one trailing ';': "session=abc123;" -> "session=abc123"
     #
     Q=${Q%;}
 
     #
     # Decode the name of the key; see the parameter section above.
     #
+    # cut at the first '=':    "session=abc123" -> "session"
     name=${Q%%=*}
+    # every % becomes \x:      "a%73b"          -> "a\x73b"
     name=${name//%/\\x}
+    # '+' is an encoded space: "a+b"            -> "a b"
     name=${name//+/ }
+    # delete '.' and '-':      "user.name"      -> "username"
     name=${name//[.-]/}
+    # decode \xHH hex:         "a\x73b"         -> "asb"
     printf -v name '%b' "${name}"
 
     #
     # Decode the cookie value; see the parameter section above.
     #
+    # cut at the first '=':    "q=a%20b" -> "a%20b"
     value=${Q#*=}
+    # decode %XX:              "a%20b"   -> "a b"
     printf -v value '%b' "${value//%/\\x}"
 
     #
@@ -142,9 +166,12 @@ version_html() {
 # Anything that is not a valid variable name yields an empty value.
 #
 _param_value() {
+  # "foo" and "FORM_foo" both give "FORM_foo"
   local name="FORM_${1#FORM_}"
   case ${name} in
+    # empty name or not a valid variable name -> empty value
     FORM_|FORM_*[!A-Za-z0-9_]*) REPLY= ;;
+    # ${!name} is the value of the variable whose name is in $name
     *) REPLY="${!name}" ;;
   esac
 }
@@ -163,6 +190,7 @@ param() {
   local name value
   if [ $# -eq 1 ]; then
     _param_value "$1"
+    # '+' is an encoded space: "a+b" -> "a b"
     value="${REPLY//+/ }"
   elif [ $# -gt 1 ]; then
     name=$1
@@ -170,7 +198,9 @@ param() {
     eval "export 'FORM_${name}=$*'"
     return
   else
+    # ${!FORM_@} expands to every existing variable named FORM_*
     for name in ${!FORM_@}; do
+      # "FORM_foo" -> "foo"
       echo "${name#FORM_}"
     done
     return
@@ -185,7 +215,9 @@ safe_param() {
   local value
   if [ $# -eq 1 ]; then
     _param_value "$1"
+    # '+' is an encoded space: "a+b" -> "a b"
     value="${REPLY//+/ }"
+    # delete the SAFE_STRIP characters: 'a$b"c' -> 'abc'
     echo "${value//${SAFE_STRIP}/}"
   else
     param "$@"
@@ -196,9 +228,12 @@ safe_param() {
 cookie() {
   local name value
   if [ $# -eq 1 ]; then
+    # "foo" and "COOKIE_foo" both give "COOKIE_foo"
     name="COOKIE_${1#COOKIE_}"
     case ${name} in
+      # empty name or not a valid variable name -> empty value
       COOKIE_|COOKIE_*[!A-Za-z0-9_]*) value= ;;
+      # ${!name} is the value of the variable whose name is in $name
       *) value="${!name}" ;;
     esac
   elif [ $# -gt 1 ]; then
@@ -207,7 +242,9 @@ cookie() {
     eval "export 'COOKIE_${name}=$*'"
     return
   else
+    # ${!COOKIE_@} expands to every existing variable named COOKIE_*
     for name in ${!COOKIE_@}; do
+      # "COOKIE_foo" -> "foo"
       echo "${name#COOKIE_}"
     done
     return
@@ -227,8 +264,10 @@ set_cookie() {
   local name=$1
   shift
   local value=$*
+  # "" -> "; a=1" -> "; a=1; b=2"
   bashlib_cookies="${bashlib_cookies}; ${name}=${value}"
 
+  # drop the leading ';' only (the space after it stays): "; a=1" -> " a=1"
   bashlib_cookies=${bashlib_cookies#;}
 
   cookie "$name" "$value"
